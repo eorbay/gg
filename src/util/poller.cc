@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <cassert>
 #include "poller.hh"
 #include "exception.hh"
 
@@ -21,38 +22,38 @@ unsigned int Poller::Action::service_count( void ) const
 
 Poller::Result Poller::poll( const int & timeout_ms )
 {
-  assert( pollfds_.size() == actions_.size() );
-
-  /* tell poll whether we care about each fd */
-  for ( unsigned int i = 0; i < actions_.size(); i++ ) {
-    assert( pollfds_.at( i ).fd == actions_.at( i ).fd.fd_num() );
-    pollfds_.at( i ).events = (actions_.at( i ).active and actions_.at( i ).when_interested())
-      ? actions_.at( i ).direction : 0;
-
-    /* don't poll in on fds that have had EOF */
-    if ( actions_.at( i ).direction == Direction::In
-       and actions_.at( i ).fd.eof() ) {
-      pollfds_.at( i ).events = 0;
+  /* make the pollfds structure */
+  vector<pollfd> pollfds;
+  for ( const Action & action : actions_ ) {
+    /* tell poll whether we care about each fd */
+    pollfd poll_entry { action.fd.fd_num(), 0, 0 };
+    poll_entry.fd = action.fd.fd_num();
+    if ( action.when_interested()
+         and not ( action.direction == Direction::In
+                   and action.fd.eof() ) ) {
+      poll_entry.events = action.direction;
     }
   }
 
   /* Quit if no member in pollfds_ has a non-zero direction */
-  if ( not accumulate( pollfds_.begin(), pollfds_.end(), false,
+  if ( not accumulate( pollfds.begin(), pollfds.end(), false,
              [] ( bool acc, pollfd x ) { return acc or x.events; } ) ) {
     return Result::Type::Exit;
   }
 
-  if ( 0 == CheckSystemCall( "poll", ::poll( &pollfds_[ 0 ], pollfds_.size(), timeout_ms ) ) ) {
+  assert( pollfds.size() == actions.size() );
+
+  if ( 0 == CheckSystemCall( "poll", ::poll( &pollfds[ 0 ], pollfds.size(), timeout_ms ) ) ) {
     return Result::Type::Timeout;
   }
 
-  for ( unsigned int i = 0; i < pollfds_.size(); i++ ) {
-    if ( pollfds_[ i ].revents & (POLLERR | POLLHUP | POLLNVAL) ) {
+  for ( unsigned int i = 0; i < pollfds.size(); i++ ) {
+    if ( pollfds[ i ].revents & (POLLERR | POLLHUP | POLLNVAL) ) {
       //            throw Exception( "poll fd error" );
       return Result::Type::Exit;
     }
 
-    if ( pollfds_[ i ].revents & pollfds_[ i ].events ) {
+    if ( pollfds[ i ].revents & pollfds[ i ].events ) {
       /* we only want to call callback if revents includes
         the event we asked for */
       const auto count_before = actions_.at( i ).service_count();
@@ -62,7 +63,7 @@ Poller::Result Poller::poll( const int & timeout_ms )
       case ResultType::Exit:
         return Result( Result::Type::Exit, result.exit_status );
       case ResultType::Cancel:
-        actions_.at( i ).active = false;
+        actions.erase( actions_.begin() + i );
         break;
       case ResultType::Continue:
         break;

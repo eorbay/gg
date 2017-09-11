@@ -26,25 +26,23 @@ public:
 
     typedef std::function<Result(void)> CallbackType;
 
-    FileDescriptor & fd;
+    FileDescriptor * fd;
     enum PollDirection : short { In = POLLIN, Out = POLLOUT } direction;
     CallbackType callback;
     std::function<bool(void)> when_interested;
-    bool active;
 
     Action( FileDescriptor & s_fd,
         const PollDirection & s_direction,
         const CallbackType & s_callback,
         const std::function<bool(void)> & s_when_interested = [] () { return true; } )
       : fd( s_fd ), direction( s_direction ), callback( s_callback ),
-       when_interested( s_when_interested ), active( true ) {}
+       when_interested( s_when_interested ) {}
 
     unsigned int service_count( void ) const;
   };
 
 private:
   std::vector<Action> actions_;
-  std::vector<pollfd> pollfds_;
 
 public:
   struct Result
@@ -55,7 +53,7 @@ public:
       : result( s_result ), exit_status( s_status ) {}
   };
 
-  Poller() : actions_(), pollfds_() {}
+  Poller() : actions_() {}
   void add_action( Action action );
   Result poll( const int & timeout_ms );
 };

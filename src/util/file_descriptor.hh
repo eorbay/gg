@@ -5,6 +5,7 @@
 
 #include <string>
 #include <unistd.h>
+#include <cassert>
 
 /* maximum size of a read */
 static constexpr size_t BUFFER_SIZE = 1024 * 1024;
@@ -38,7 +39,7 @@ public:
 
   /* accessors */
   const int & fd_num( void ) const { return fd_; }
-  const bool & eof( void ) const { return eof_; }
+  const bool & eof( void ) const { assert( fd_ >= 0 ); return eof_; }
   unsigned int read_count( void ) const { return read_count_; }
   unsigned int write_count( void ) const { return write_count_; }
 
