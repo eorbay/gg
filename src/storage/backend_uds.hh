@@ -6,22 +6,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include "boost/asio.hpp"
 #include "backend.hh"
-
-using boost::asio::local::stream_protocol;
+#include "unix_socket.hh"
 
 class UDSStorageBackend : public StorageBackend
 {
-private:
-  const std::string & pathname_;
-  boost::asio::io_service io_service_;
-  stream_protocol::socket sock_;
-  stream_protocol::endpoint end_;
-  
 public:
-  UDSStorageBackend( const std::string & path ); 
-  
+  UDSStorageBackend( void ); 
+ 
   void put( const std::vector<storage::PutRequest> & requests,
             const PutCallback & success_callback = []( const storage::PutRequest & ){} ) override;
 

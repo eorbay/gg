@@ -85,6 +85,14 @@ def install_lambda_package(package_file, function_name, role, region, delete=Fal
         Code={
             'ZipFile': package_data
         },
+	VpcConfig={
+        	'SubnetIds': [
+            		'subnet-30e52d6b', 'subnet-7206be15'
+        ],
+        'SecurityGroupIds': [
+            'sg-2e979448', 'sg-50a5a636', 'sg-66636800', 'sg-ae666dc8', 'sg-e4909382'
+        ]
+    	},
         Timeout=300,
         MemorySize=1536,
         Tags={

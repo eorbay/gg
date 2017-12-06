@@ -35,7 +35,7 @@ void GGExecutionEngine::force_thunk( const string & hash,
                                      const Thunk & thunk,
                                      ExecutionLoop & exec_loop )
 {
-  HTTPRequest request = generate_request( thunk, hash, false );
+  HTTPRequest request = generate_request( thunk, hash, true );
 
   TCPSocket socket;
   socket.set_blocking( false );

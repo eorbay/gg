@@ -15,13 +15,16 @@ GG_LDADD = ../execution/libggexecution.a ../storage/libggstorage.a \
 
 BASE_LDADD = $(GG_LDADD) $(PROTOBUF_LIBS)
 
-bin_PROGRAMS = gg-trace gg-describe gg-force-and-run gg-force gg-mock \
+bin_PROGRAMS = gg-test-uds gg-trace gg-describe gg-force-and-run gg-force gg-mock \
                gg-execute gg-infer gg-thunkgraph gg-thunksummary gg-s3-upload \
                gg-s3-download gg-init lambda-invoker
 
 if BUILD_STATIC_BINS
   bin_PROGRAMS += gg-execute-static gg-s3-download-static
 endif
+
+gg_test_uds_SOURCES = gg-test-uds.cc
+gg_test_uds_LDADD = $(BASE_LDADD) 
 
 gg_trace_SOURCES = gg-trace.cc
 gg_trace_LDADD = $(BASE_LDADD)

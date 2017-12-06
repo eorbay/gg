@@ -18,6 +18,7 @@
 #include "timeit.hh"
 #include "status_bar.hh"
 #include "reductor.hh"
+#include "backend_uds.hh"
 #include "backend_s3.hh"
 #include "backend_local.hh"
 
@@ -131,10 +132,14 @@ int main( int argc, char * argv[] )
     }
 
     if ( lambda_execution or ggremote_execution ) {
-      storage_backend = make_unique<S3StorageBackend>( AWSCredentials {},
+
+      storage_backend = make_unique<UDSStorageBackend>();
+	      
+	      /* make_unique<S3StorageBackend>( AWSCredentials {},
                                                        gg::remote::s3_bucket(),
                                                        gg::remote::s3_region() );
-    }
+              */
+  }
 
     Reductor reductor { target_hashes, max_jobs, execution_environments,
                         move( storage_backend ), status_bar };

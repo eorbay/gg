@@ -8,6 +8,13 @@ sys.path.append(curdir)
 sys.path.append(os.path.join(curdir, 'packages'))
 os.environ['PATH'] = "{}:{}".format(curdir, os.environ.get('PATH', ''))
 
+print("Connecting to redis!")
+import redis
+redis_host = "gg-tester-001.o4kv0a.0001.usw1.cache.amazonaws.com"
+redis_port = 6379
+r = redis.Redis(host=redis_host, port=redis_port)
+print("Connected!")
+
 if not os.environ.get('GG_DIR'):
     os.environ['GG_DIR'] = "/tmp/_gg"
 
@@ -48,20 +55,29 @@ def fetch_dependencies(gginfo, infiles, cleanup_first=True):
         for x in os.listdir(blob_path):
             if x not in infile_hashes:
                 os.remove(os.path.join(blob_path, x))
+    
 
     for infile in infiles:
         bpath = GGPaths.blob_path(infile['hash'])
         if os.path.exists(bpath) and os.path.getsize(bpath) == infile['size']:
             continue
+        print("About to download: %s" %infile['hash'])
+        blob = r.get(infile['hash'])
+        if blob is None:
+            return False
+        print("Downloaded: %s" %infile['hash'])
+        with open(bpath, "wb") as bfile:
+            bfile.write(blob)
+        print("Finished writing %s" %infile['hash'])
+        #download_list += [infile['hash']]
+    
+    print("Finished downloads!")
+    #s3_ip = socket.gethostbyname('{}.s3.amazonaws.com'.format(gginfo.s3_bucket))
+    #p = sub.Popen(['gg-s3-download', gginfo.s3_region, gginfo.s3_bucket, s3_ip], stdout=sub.PIPE, stdin=sub.PIPE, stderr=sub.PIPE)
+    #out, err = p.communicate(input="\n".join(download_list).encode('ascii'))
 
-        download_list += [infile['hash']]
-
-    s3_ip = socket.gethostbyname('{}.s3.amazonaws.com'.format(gginfo.s3_bucket))
-    p = sub.Popen(['gg-s3-download', gginfo.s3_region, gginfo.s3_bucket, s3_ip], stdout=sub.PIPE, stdin=sub.PIPE, stderr=sub.PIPE)
-    out, err = p.communicate(input="\n".join(download_list).encode('ascii'))
-
-    if p.returncode != 0:
-        return False
+    #if p.returncode != 0:
+    #    return False
 
     return True
 
@@ -88,7 +104,7 @@ def handler(event, context):
     gginfo.s3_region = event['s3_region']
     gginfo.infiles = event['infiles']
 
-    enable_timelog = event.get('timelog', False)
+    enable_timelog = event.get('timelog', True)
     timelogger = TimeLog(enabled=enable_timelog)
 
     thunk_data = b64decode(event['thunk_data'])
@@ -116,9 +132,10 @@ def handler(event, context):
         return {
             'errorType': 'GG-FetchDependenciesFailed'
         }
-
+   
     for infile in gginfo.infiles:
         if infile['executable']:
+            print("exe %s" %infile['hash'])
             make_executable(GGPaths.blob_path(infile['hash']))
 
     timelogger.add_point("fetching the dependencies")
@@ -142,8 +159,16 @@ def handler(event, context):
     executable = is_executable(GGPaths.blob_path(result))
 
     timelogger.add_point("check the outfile")
-
+    """
     s3_client = boto3.client('s3')
+    """ 
+    print("writing %s" %GGPaths.blob_path(result))
+    with open(GGPaths.blob_path(result), "rb") as bfile:
+        blob = bfile.read()
+        print("file read")
+        r.set(result, blob)
+        print("redis key set")
+    """
     s3_client.upload_file(GGPaths.blob_path(result), gginfo.s3_bucket, result)
 
     s3_client.put_object_acl(
@@ -162,7 +187,7 @@ def handler(event, context):
             ]
         }
     )
-
+    
     timelogger.add_point("upload outfile to s3")
 
     if enable_timelog:
@@ -174,7 +199,7 @@ def handler(event, context):
                       'started': timelogger.start,
                       'timelog': timelogger.points}).encode('utf-8')
         )
-
+    """
     return {
         'thunk_hash': gginfo.thunk_hash,
         'output_hash': result,

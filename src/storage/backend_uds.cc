@@ -8,15 +8,15 @@
 using namespace std;
 using namespace storage;
 
-UDSStorageBackend::UDSStorageBackend( const std::string & path)
-  : pathname_(path), io_service_(), sock_(io_service_), end_(pathname_)
-{
-  sock_.connect(end_);
-}
+UDSStorageBackend::UDSStorageBackend( void )
+{}
 
 void UDSStorageBackend::put( const std::vector<PutRequest> & requests,
                             const PutCallback & success_callback )
 {
+  UnixDomainSocket uds;
+  json::Object data;
+  data["type"] = json::String(std::string("PUT"));
   json::Array put_requests;
   for (auto& req : requests) {
     json::Object putreq;
@@ -25,17 +25,21 @@ void UDSStorageBackend::put( const std::vector<PutRequest> & requests,
     putreq["hash"] = json::String(req.content_hash.get_or(std::string("")));
     put_requests.Insert(putreq);
   }
-  
-  std::ostringstream oss;
-  json::Writer::Write(put_requests, oss);
+  data["requests"] = put_requests;
 
-  const char* puts = oss.str().c_str();
+  std::ostringstream oss;
+  json::Writer::Write(data, oss);
+  std::string json_str = oss.str();
+  unsigned int json_len = json_str.length();
+  std::cout << "Len: " << json_len << " str: " << json_str << std::endl;
+  std::ostringstream oss2;
+  oss2.write(reinterpret_cast<const char*>(&json_len), sizeof(unsigned int));
+  oss2 << json_str;
   
-  boost::asio::write(sock_, boost::asio::buffer(puts, std::strlen(puts)));
+  uds.send(oss2.str());
   
-  char buffer[1];
-  size_t bytesRead = boost::asio::read(sock_, boost::asio::buffer(buffer, 1));
-  if (bytesRead > 0) {
+  std::string recv_data = uds.recv();
+  if (recv_data.size() > 0) {
     for (auto& req : requests) {
       success_callback(req);
     }
@@ -44,24 +48,33 @@ void UDSStorageBackend::put( const std::vector<PutRequest> & requests,
 
 void UDSStorageBackend::get( const std::vector<GetRequest> & requests,
                             const GetCallback & success_callback )
-{
+{ 
+  UnixDomainSocket uds;
   json::Array get_requests;
+  json::Object data;
+  data["type"] = json::String(std::string("GET"));
   for (auto& req : requests) {
     json::Object get;
     get["object-key"] = json::String(req.object_key);
     get["filename"] = json::String(req.filename.string());
     get_requests.Insert(get);
   }
+
+  data["requests"] = get_requests;
+  
   std::ostringstream oss;
-  json::Writer::Write(get_requests, oss);
-
-  const char* gets = oss.str().c_str();
-
-  boost::asio::write(sock_, boost::asio::buffer(gets, std::strlen(gets)));
- 
-  char buffer[1];
-  size_t bytesRead = boost::asio::read(sock_, boost::asio::buffer(buffer, 1));
-  if (bytesRead > 0) {
+  json::Writer::Write(data, oss);
+  std::string json_str = oss.str();
+  unsigned int json_len = json_str.length();
+  std::cout << "Len: " << json_len << " str: " << json_str << std::endl;
+  std::ostringstream oss2;
+  oss2.write(reinterpret_cast<const char*>(&json_len), sizeof(unsigned int));
+  oss2 << json_str;
+  
+  uds.send(oss2.str());
+  
+  std::string recv_data = uds.recv();
+  if (recv_data.size() > 0) {
     for (auto& req : requests) {
       success_callback(req);
     }
