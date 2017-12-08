@@ -159,9 +159,9 @@ def handler(event, context):
     executable = is_executable(GGPaths.blob_path(result))
 
     timelogger.add_point("check the outfile")
-    """
+    
     s3_client = boto3.client('s3')
-    """ 
+    
     print("writing %s" %GGPaths.blob_path(result))
     with open(GGPaths.blob_path(result), "rb") as bfile:
         blob = bfile.read()
@@ -187,10 +187,11 @@ def handler(event, context):
             ]
         }
     )
-    
+    """
     timelogger.add_point("upload outfile to s3")
 
     if enable_timelog:
+        print("s3 timelog uploading..")
         s3_client.put_object(
             ACL='public-read',
             Bucket=gginfo.s3_bucket,
@@ -199,7 +200,7 @@ def handler(event, context):
                       'started': timelogger.start,
                       'timelog': timelogger.points}).encode('utf-8')
         )
-    """
+    print("s3 timelog uploaded!") 
     return {
         'thunk_hash': gginfo.thunk_hash,
         'output_hash': result,
